@@ -1,0 +1,50 @@
+name: Update geodata
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "45 22 * * *" # 6:45 AM UTC+8
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Download geoip.dat
+      run: curl -L "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip-lite.dat" > geoip.dat
+
+    - name: Download geoip.dat.sha256sum
+      run: curl -L "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip-lite.dat.sha256sum" | sed 's/-lite//' > geoip.dat.sha256sum
+
+    - name: Download geosite.dat
+      run: curl -L "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite-lite.dat" > geosite.dat
+
+    - name: Download geosite.dat.sha256sum
+      run: curl -L "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite-lite.dat.sha256sum" | sed 's/-lite//' > geosite.dat.sha256sum
+
+    - name: Get Latest Release Title from MetaCubeX/meta-rules-dat
+      run: |
+        RELEASE_TITLE=$(curl -s https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest | jq -r '.name')
+        echo "release_title=$RELEASE_TITLE" >> $GITHUB_ENV
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Delete current release assets
+      uses: andreaswilli/delete-release-assets-action@v3.0.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        tag: latest
+        deleteOnlyFromDrafts: false
+
+    - name: Create and Upload Release
+      id: upload_release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        release_name: ${{env.release_title}}
+        tag: latest
+        file_glob: true
+        overwrite: true
+        file: ./*.dat*
